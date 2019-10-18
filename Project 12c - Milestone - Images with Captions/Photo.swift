@@ -8,12 +8,12 @@
 
 import UIKit
 
-class Photo: NSObject {
-    let image: UIImage
-    let caption: String
+class Photo: NSObject, Codable {
+    var imageName: String
+    var caption: String
     
-    init(image: UIImage, caption: String) {
-        self.image = image
+    init(imageName: String, caption: String) {
+        self.imageName = imageName
         self.caption = caption
     }
     

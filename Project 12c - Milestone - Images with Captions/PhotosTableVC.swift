@@ -17,10 +17,22 @@ class PhotosTableVC: UITableViewController, UIImagePickerControllerDelegate, UIN
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        
+        let jsonDecoder = JSONDecoder()
+        
+        if let photosData = UserDefaults.standard.object(forKey: "photos") as? Data {
+            
+            do {
+                photos = try jsonDecoder.decode([Photo].self, from: photosData)
+            } catch {
+                print("Data could not be decdoded")
+            }
+        }
+
 
     }
 
-    // MARK: - Table view data source
+    // MARK: - Table view data source & Delegates
 
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -31,32 +43,32 @@ class PhotosTableVC: UITableViewController, UIImagePickerControllerDelegate, UIN
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "PhotoCell", for: indexPath) as! PhotoCell
         let photo = photos[indexPath.row]
-        cell.photoView.image = photo.image
+        print(photo.imageName)
+        
+        let path = getDocumentsDirectory().appendingPathComponent(photo.imageName)
+        print(path.path)
+        cell.photoView.image = UIImage(contentsOfFile: path.path)
         cell.captionLabel.text = photo.caption
         
         return cell
     }
 
 
-    /*
-    // Override to support conditional editing of the table view.
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the specified item to be editable.
-        return true
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let vc = storyboard?.instantiateViewController(identifier: "photo")
+        vc.ph
     }
-    */
-
-    /*
+    
     // Override to support editing the table view.
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             // Delete the row from the data source
+            photos.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .fade)
-        } else if editingStyle == .insert {
-            // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-        }    
+            save()
+        }
     }
-    */
+    
     
     //MARK: - Image Picker Delegates
     
@@ -64,30 +76,50 @@ class PhotosTableVC: UITableViewController, UIImagePickerControllerDelegate, UIN
         guard let image = info[.editedImage] as? UIImage else { return }
         
         let imageName = UUID().uuidString
-        let imagePath = getUserDirectory().appendingPathComponent(imageName)
+        let imagePath = getDocumentsDirectory().appendingPathComponent(imageName)
         
         //Write image to disk as jpeg
         if let jpegData = image.jpegData(compressionQuality: 0.8) {
             try? jpegData.write(to: imagePath)
         }
         
-        let photo = Photo(image: image, caption: "")
+        let photo = Photo(imageName: imageName, caption: "Tap to write caption")
         photos.append(photo)
-        //TODO: save
+        save()
         
         tableView.reloadData()
-        
+
         dismiss(animated: true)
+        
+        let ac = UIAlertController(title: "Add Caption", message: nil, preferredStyle: .alert)
+        ac.addTextField()
+        ac.addAction(UIAlertAction(title: "Add", style: .default, handler: { [weak self, weak ac] _ in
+            guard let caption = ac?.textFields?[0].text else { return }
+            
+            photo.caption = caption
+            self?.save()
+            self?.tableView.reloadData()
+        }))
+        present(ac, animated: true)
     }
 
 
     //MARK: - Private Methods
     
-    func getUserDirectory() -> URL {
-        let path = FileManager.default.urls(for: .documentationDirectory, in: .userDomainMask)
+    func getDocumentsDirectory() -> URL {
+        let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         return path[0]
     }
 
+    //Encode photos aray to json data and save to user defaults
+    func save() {
+        let jsonEncoder = JSONEncoder()
+
+        if let savedData =  try? jsonEncoder.encode(photos) {
+            let defaults = UserDefaults.standard
+            defaults.set(savedData, forKey: "photos")
+        }
+    }
     
     
     //MARK: Action Methods
